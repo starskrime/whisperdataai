@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Excel File - Excel Data Chat{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-section {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 60px 40px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .upload-section h2 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 2em;
+    }
+
+    .upload-form {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .file-input-wrapper {
+        position: relative;
+        margin-bottom: 20px;
+    }
+
+    .file-input-label {
+        display: block;
+        padding: 40px;
+        border: 3px dashed #667eea;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: #f8f9fa;
+    }
+
+    .file-input-label:hover {
+        background: #e9ecef;
+        border-color: #764ba2;
+    }
+
+    .file-input-label i {
+        font-size: 3em;
+        color: #667eea;
+        margin-bottom: 15px;
+    }
+
+    input[type="file"] {
+        display: none;
+    }
+
+    #file-name {
+        margin-top: 15px;
+        color: #28a745;
+        font-weight: 600;
+    }
+
+    .recent-files {
+        margin-top: 40px;
+    }
+
+    .recent-files h3 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 1.5em;
+    }
+
+    .file-list {
+        list-style: none;
+    }
+
+    .file-item {
+        background: white;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s;
+    }
+
+    .file-item:hover {
+        transform: translateX(5px);
+    }
+
+    .file-info {
+        flex: 1;
+    }
+
+    .file-name {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .file-meta {
+        color: #6c757d;
+        font-size: 0.9em;
+    }
+
+    .file-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn-small {
+        padding: 8px 20px;
+        font-size: 0.9em;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 4em;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="upload-section">
+    <h2>Upload Your Excel File</h2>
+    <p style="color: #666; margin-bottom: 30px;">Support for .xlsx and .xls files (max 10MB)</p>
+
+    <div class="upload-form">
+        <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data" id="upload-form">
+            {% csrf_token %}
+            <div class="file-input-wrapper">
+                <label for="file-input" class="file-input-label">
+                    <div>📄</div>
+                    <div style="font-size: 1.2em; color: #333; margin-top: 10px;">
+                        Click to select an Excel file
+                    </div>
+                    <div style="color: #6c757d; margin-top: 10px;">
+                        or drag and drop here
+                    </div>
+                </label>
+                <input type="file" id="file-input" name="file" accept=".xlsx,.xls" required>
+                <div id="file-name"></div>
+            </div>
+            <button type="submit" class="btn">Upload and Start Chatting</button>
+        </form>
+    </div>
+</div>
+
+{% if recent_files %}
+<div class="recent-files">
+    <h3>Recent Files</h3>
+    <ul class="file-list">
+        {% for file in recent_files %}
+        <li class="file-item">
+            <div class="file-info">
+                <div class="file-name">📊 {{ file.filename }}</div>
+                <div class="file-meta">
+                    Uploaded {{ file.uploaded_at|date:"M d, Y H:i" }} •
+                    {{ file.file_size|filesizeformat }}
+                </div>
+            </div>
+            <div class="file-actions">
+                <form method="post" action="{% url 'new_chat' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="file_id" value="{{ file.id }}">
+                    <button type="submit" class="btn btn-small">New Chat</button>
+                </form>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% else %}
+<div class="empty-state">
+    <div>📊</div>
+    <p>No files uploaded yet. Upload your first Excel file to get started!</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        const fileName = e.target.files[0]?.name;
+        const fileNameDiv = document.getElementById('file-name');
+        if (fileName) {
+            fileNameDiv.textContent = '✓ Selected: ' + fileName;
+        }
+    });
+
+    // Drag and drop functionality
+    const label = document.querySelector('.file-input-label');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        label.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        label.addEventListener(eventName, () => {
+            label.style.background = '#e9ecef';
+            label.style.borderColor = '#764ba2';
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        label.addEventListener(eventName, () => {
+            label.style.background = '#f8f9fa';
+            label.style.borderColor = '#667eea';
+        }, false);
+    });
+
+    label.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        document.getElementById('file-input').files = files;
+
+        if (files[0]) {
+            document.getElementById('file-name').textContent = '✓ Selected: ' + files[0].name;
+        }
+    }, false);
+</script>
+{% endblock %}

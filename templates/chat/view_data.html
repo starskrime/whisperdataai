@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ session.excel_file.filename }} - Data View - WhisperData{% endblock %}
+
+{% block extra_css %}
+<style>
+    .data-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .data-header h2 {
+        color: #333;
+        font-size: 1.8em;
+    }
+
+    .sheet-selector {
+        margin-bottom: 20px;
+    }
+
+    .sheet-selector label {
+        font-weight: 600;
+        color: #333;
+        margin-right: 10px;
+    }
+
+    .sheet-selector select {
+        padding: 10px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1em;
+        outline: none;
+        cursor: pointer;
+    }
+
+    .data-info {
+        background: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        color: #666;
+    }
+
+    .table-container {
+        overflow-x: auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+
+    table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .back-buttons {
+        display: flex;
+        gap: 10px;
+    }
+
+    .note {
+        margin-top: 20px;
+        padding: 15px;
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 8px;
+        color: #856404;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="data-header">
+    <h2>📊 {{ session.excel_file.filename }}</h2>
+    <div class="back-buttons">
+        <a href="{% url 'chat_session' session.id %}" class="btn">Back to Chat</a>
+        <a href="{% url 'index' %}" class="btn btn-secondary">Home</a>
+    </div>
+</div>
+
+{% if sheet_names|length > 1 %}
+<div class="sheet-selector">
+    <label for="sheet-select">Select Sheet:</label>
+    <select id="sheet-select" onchange="changeSheet(this.value)">
+        {% for sheet in sheet_names %}
+        <option value="{{ sheet }}" {% if sheet == sheet_name %}selected{% endif %}>
+            {{ sheet }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+{% endif %}
+
+<div class="data-info">
+    <strong>Sheet:</strong> {{ sheet_name }} |
+    <strong>Showing:</strong> {{ total_rows }} rows
+    {% if total_rows >= 100 %}(limited to first 100 rows){% endif %}
+</div>
+
+<div class="table-container">
+    {{ table_html|safe }}
+</div>
+
+{% if total_rows >= 100 %}
+<div class="note">
+    <strong>Note:</strong> Only the first 100 rows are displayed for performance reasons.
+    Use the chat interface to query specific data or get summaries.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function changeSheet(sheetName) {
+        window.location.href = '{% url "view_data" session.id %}?sheet=' + encodeURIComponent(sheetName);
+    }
+</script>
+{% endblock %}
