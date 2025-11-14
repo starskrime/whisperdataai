@@ -6,6 +6,9 @@ An AI-powered Excel data analysis application that lets you chat with your sprea
 
 WhisperData is a Django web application that combines the power of Claude AI with Excel data analysis. Upload your Excel files and ask questions about your data in plain English - WhisperData will analyze your data and provide intelligent insights, summaries, and answers.
 
+<img width="1650" height="1722" alt="image" src="https://github.com/user-attachments/assets/5bc0b345-a488-408f-9687-dd17302821f2" />
+
+
 ## Features
 
 - **Upload Excel Files**: Support for .xlsx and .xls files
