@@ -118,13 +118,133 @@ class ExcelProcessor:
 
         return "\n".join(text_parts)
 
+    # Tool execution methods for AI to call
+    def get_rows(self, start_row, end_row, sheet_name=None):
+        """Get specific rows from the Excel file"""
+        df = self.read_sheet(sheet_name)
+
+        # Validate row range
+        if start_row < 0 or end_row > len(df):
+            return f"Error: Invalid row range. File has {len(df)} rows (0-indexed)."
+
+        result = df.iloc[start_row:end_row].to_string(index=True)
+        return f"Rows {start_row} to {end_row}:\n{result}"
+
+    def filter_data(self, column, operator, value, sheet_name=None):
+        """Filter rows by condition"""
+        df = self.read_sheet(sheet_name)
+
+        # Validate column exists
+        if column not in df.columns:
+            return f"Error: Column '{column}' not found. Available columns: {', '.join(df.columns)}"
+
+        try:
+            # Convert value to appropriate type
+            if df[column].dtype in ['int64', 'float64']:
+                value = float(value)
+
+            # Apply filter
+            if operator == '>':
+                filtered = df[df[column] > value]
+            elif operator == '<':
+                filtered = df[df[column] < value]
+            elif operator == '==':
+                filtered = df[df[column] == value]
+            elif operator == '!=':
+                filtered = df[df[column] != value]
+            elif operator == '>=':
+                filtered = df[df[column] >= value]
+            elif operator == '<=':
+                filtered = df[df[column] <= value]
+            elif operator == 'contains':
+                filtered = df[df[column].astype(str).str.contains(str(value), case=False, na=False)]
+            else:
+                return f"Error: Unsupported operator '{operator}'. Use: >, <, ==, !=, >=, <=, contains"
+
+            if len(filtered) == 0:
+                return f"No rows match the condition: {column} {operator} {value}"
+
+            # Limit results to prevent overwhelming the AI
+            if len(filtered) > 100:
+                result = filtered.head(100).to_string(index=True)
+                return f"Found {len(filtered)} matching rows. Showing first 100:\n{result}"
+            else:
+                result = filtered.to_string(index=True)
+                return f"Found {len(filtered)} matching rows:\n{result}"
+
+        except Exception as e:
+            return f"Error applying filter: {str(e)}"
+
+    def calculate(self, operation, column, sheet_name=None):
+        """Calculate sum, mean, median, count, min, max on a column"""
+        df = self.read_sheet(sheet_name)
+
+        # Validate column exists
+        if column not in df.columns:
+            return f"Error: Column '{column}' not found. Available columns: {', '.join(df.columns)}"
+
+        try:
+            col_data = df[column]
+
+            # Remove NaN values for calculations
+            col_data_clean = col_data.dropna()
+
+            if operation == 'sum':
+                result = col_data_clean.sum()
+                return f"Sum of '{column}': {result:,.2f}"
+            elif operation == 'mean' or operation == 'average':
+                result = col_data_clean.mean()
+                return f"Mean of '{column}': {result:,.2f}"
+            elif operation == 'median':
+                result = col_data_clean.median()
+                return f"Median of '{column}': {result:,.2f}"
+            elif operation == 'count':
+                result = len(col_data_clean)
+                return f"Count of '{column}' (non-null): {result:,}"
+            elif operation == 'min':
+                result = col_data_clean.min()
+                return f"Minimum of '{column}': {result}"
+            elif operation == 'max':
+                result = col_data_clean.max()
+                return f"Maximum of '{column}': {result}"
+            elif operation == 'std':
+                result = col_data_clean.std()
+                return f"Standard deviation of '{column}': {result:,.2f}"
+            else:
+                return f"Error: Unsupported operation '{operation}'. Use: sum, mean, median, count, min, max, std"
+
+        except Exception as e:
+            return f"Error calculating {operation}: {str(e)}"
+
+    def get_unique_values(self, column, sheet_name=None):
+        """Get unique values in a column"""
+        df = self.read_sheet(sheet_name)
+
+        # Validate column exists
+        if column not in df.columns:
+            return f"Error: Column '{column}' not found. Available columns: {', '.join(df.columns)}"
+
+        try:
+            unique_vals = df[column].unique()
+            unique_count = len(unique_vals)
+
+            if unique_count > 50:
+                sample = unique_vals[:50]
+                return f"Column '{column}' has {unique_count} unique values. First 50: {', '.join(map(str, sample))}"
+            else:
+                return f"Column '{column}' has {unique_count} unique values: {', '.join(map(str, unique_vals))}"
+
+        except Exception as e:
+            return f"Error getting unique values: {str(e)}"
+
 
 class AIAgent:
     """Utility class for AI-powered chat using Anthropic or OpenAI"""
 
-    def __init__(self, provider=None):
+    def __init__(self, provider=None, excel_processor=None):
         # Use provider from parameter or settings
         self.provider = (provider or settings.AI_PROVIDER).lower()
+        self.excel_processor = excel_processor
 
         if self.provider == 'anthropic':
             if not settings.ANTHROPIC_API_KEY:
@@ -138,6 +258,136 @@ class AIAgent:
             self.model = "gpt-4o"
         else:
             raise ValueError(f"Invalid AI provider: {self.provider}. Must be 'anthropic' or 'openai'")
+
+    def get_tools(self):
+        """Define tools available to the AI"""
+        return [
+            {
+                "name": "get_rows",
+                "description": "Get specific rows from the Excel file by row number range. Use this when you need to see exact data for specific rows.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "start_row": {
+                            "type": "integer",
+                            "description": "Starting row number (0-indexed)"
+                        },
+                        "end_row": {
+                            "type": "integer",
+                            "description": "Ending row number (0-indexed, exclusive)"
+                        },
+                        "sheet_name": {
+                            "type": "string",
+                            "description": "Sheet name (optional, uses first sheet if not specified)"
+                        }
+                    },
+                    "required": ["start_row", "end_row"]
+                }
+            },
+            {
+                "name": "filter_data",
+                "description": "Filter rows based on a condition. Use this to find rows that match specific criteria.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {
+                            "type": "string",
+                            "description": "Column name to filter on"
+                        },
+                        "operator": {
+                            "type": "string",
+                            "enum": [">", "<", "==", "!=", ">=", "<=", "contains"],
+                            "description": "Comparison operator"
+                        },
+                        "value": {
+                            "type": "string",
+                            "description": "Value to compare against"
+                        },
+                        "sheet_name": {
+                            "type": "string",
+                            "description": "Sheet name (optional)"
+                        }
+                    },
+                    "required": ["column", "operator", "value"]
+                }
+            },
+            {
+                "name": "calculate",
+                "description": "Perform calculations on a column (sum, mean, median, count, min, max, std). Use this for accurate numerical analysis.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "operation": {
+                            "type": "string",
+                            "enum": ["sum", "mean", "median", "count", "min", "max", "std", "average"],
+                            "description": "Calculation to perform"
+                        },
+                        "column": {
+                            "type": "string",
+                            "description": "Column name to calculate on"
+                        },
+                        "sheet_name": {
+                            "type": "string",
+                            "description": "Sheet name (optional)"
+                        }
+                    },
+                    "required": ["operation", "column"]
+                }
+            },
+            {
+                "name": "get_unique_values",
+                "description": "Get all unique values in a column. Useful for understanding categorical data or finding distinct entries.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "column": {
+                            "type": "string",
+                            "description": "Column name"
+                        },
+                        "sheet_name": {
+                            "type": "string",
+                            "description": "Sheet name (optional)"
+                        }
+                    },
+                    "required": ["column"]
+                }
+            }
+        ]
+
+    def execute_tool(self, tool_name, tool_input):
+        """Execute a tool call on the Excel processor"""
+        if not self.excel_processor:
+            return "Error: No Excel file loaded"
+
+        try:
+            if tool_name == "get_rows":
+                return self.excel_processor.get_rows(
+                    tool_input.get("start_row"),
+                    tool_input.get("end_row"),
+                    tool_input.get("sheet_name")
+                )
+            elif tool_name == "filter_data":
+                return self.excel_processor.filter_data(
+                    tool_input.get("column"),
+                    tool_input.get("operator"),
+                    tool_input.get("value"),
+                    tool_input.get("sheet_name")
+                )
+            elif tool_name == "calculate":
+                return self.excel_processor.calculate(
+                    tool_input.get("operation"),
+                    tool_input.get("column"),
+                    tool_input.get("sheet_name")
+                )
+            elif tool_name == "get_unique_values":
+                return self.excel_processor.get_unique_values(
+                    tool_input.get("column"),
+                    tool_input.get("sheet_name")
+                )
+            else:
+                return f"Error: Unknown tool '{tool_name}'"
+        except Exception as e:
+            return f"Error executing {tool_name}: {str(e)}"
 
     def create_system_prompt(self, excel_data):
         """Create a system prompt with Excel data context"""
@@ -154,34 +404,38 @@ Your role is to:
 4. Suggest improvements or highlight issues in the data
 5. Perform calculations or analysis as requested
 
-Important notes:
-- For large files (>100 rows), you are provided with a statistical summary, sample data (first and last rows), and metadata instead of the complete dataset
-- When answering questions about large files, base your insights on the summary statistics, patterns in sample data, and column information provided
-- If a user asks for specific row data that isn't in the sample, explain that you have access to a summary and suggest what analysis you can perform with the available data
-- Always base your responses on the actual data provided. If you're unsure about something, say so. Be concise but thorough in your explanations."""
+**Important - You have access to powerful tools:**
+- For large files (>100 rows), you see a summary with sample data
+- Use the `get_rows` tool to fetch specific rows you need to see
+- Use the `filter_data` tool to find rows matching criteria (e.g., sales > 1000)
+- Use the `calculate` tool for accurate sums, averages, and other calculations on columns
+- Use the `get_unique_values` tool to see all distinct values in a column
+
+**Best practices:**
+- For numerical questions (sums, averages), ALWAYS use the `calculate` tool for accuracy
+- If asked about specific rows not in the sample, use `get_rows` tool
+- If asked to find entries matching criteria, use `filter_data` tool
+- Always base responses on actual data, not assumptions
+- Be concise but thorough in explanations"""
 
     def chat(self, user_message, excel_data, conversation_history=None):
         """
-        Send a message to AI provider and get a response
+        Send a message to AI provider and get a response with tool calling support
 
         Args:
             user_message: The user's question/message
             excel_data: The Excel data as text
-            conversation_history: List of previous messages [{'role': 'user', 'content': '...'}, ...]
+            conversation_history: List of previous messages
 
         Returns:
             AI response text
         """
         system_prompt = self.create_system_prompt(excel_data)
-
-        # Build messages list
         messages = []
 
-        # Add conversation history if available
         if conversation_history:
             messages.extend(conversation_history)
 
-        # Add current user message
         messages.append({
             "role": "user",
             "content": user_message
@@ -189,28 +443,120 @@ Important notes:
 
         try:
             if self.provider == 'anthropic':
-                # Call Anthropic Claude API
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=4096,
-                    system=system_prompt,
-                    messages=messages
-                )
-                return response.content[0].text
-
+                return self._chat_anthropic(system_prompt, messages)
             elif self.provider == 'openai':
-                # Call OpenAI API
-                # Add system message at the beginning for OpenAI
-                openai_messages = [{"role": "system", "content": system_prompt}] + messages
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    max_tokens=4096,
-                    messages=openai_messages
-                )
-                return response.choices[0].message.content
+                return self._chat_openai(system_prompt, messages)
 
         except Exception as e:
             return f"Error communicating with {self.provider.title()} AI: {str(e)}"
+
+    def _chat_anthropic(self, system_prompt, messages):
+        """Handle Anthropic chat with tool calling"""
+        tools = self.get_tools() if self.excel_processor else []
+
+        # Initial API call
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=4096,
+            system=system_prompt,
+            messages=messages,
+            tools=tools if tools else None
+        )
+
+        # Process tool calls if any
+        while response.stop_reason == "tool_use":
+            # Extract tool use from response
+            tool_use_block = next((block for block in response.content if block.type == "tool_use"), None)
+
+            if not tool_use_block:
+                break
+
+            # Execute the tool
+            tool_result = self.execute_tool(tool_use_block.name, tool_use_block.input)
+
+            # Add assistant message and tool result to conversation
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": tool_use_block.id,
+                    "content": tool_result
+                }]
+            })
+
+            # Continue conversation with tool result
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4096,
+                system=system_prompt,
+                messages=messages,
+                tools=tools
+            )
+
+        # Extract final text response
+        text_blocks = [block.text for block in response.content if hasattr(block, 'text')]
+        return '\n'.join(text_blocks) if text_blocks else "No response generated"
+
+    def _chat_openai(self, system_prompt, messages):
+        """Handle OpenAI chat with tool calling"""
+        tools_definitions = self.get_tools() if self.excel_processor else []
+
+        # Convert tool schema to OpenAI format
+        openai_tools = []
+        for tool in tools_definitions:
+            openai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool["input_schema"]
+                }
+            })
+
+        # Add system message
+        openai_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        # Initial API call
+        response = self.client.chat.completions.create(
+            model=self.model,
+            max_tokens=4096,
+            messages=openai_messages,
+            tools=openai_tools if openai_tools else None
+        )
+
+        # Process tool calls if any
+        while response.choices[0].finish_reason == "tool_calls":
+            tool_calls = response.choices[0].message.tool_calls
+
+            if not tool_calls:
+                break
+
+            # Add assistant message with tool calls
+            openai_messages.append(response.choices[0].message)
+
+            # Execute each tool call
+            for tool_call in tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = json.loads(tool_call.function.arguments)
+                tool_result = self.execute_tool(tool_name, tool_args)
+
+                # Add tool result to messages
+                openai_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_result
+                })
+
+            # Continue conversation with tool results
+            response = self.client.chat.completions.create(
+                model=self.model,
+                max_tokens=4096,
+                messages=openai_messages,
+                tools=openai_tools
+            )
+
+        return response.choices[0].message.content
 
     def analyze_excel(self, excel_processor):
         """Provide an initial analysis of the Excel file"""
