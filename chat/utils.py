@@ -1,5 +1,6 @@
 import pandas as pd
 import anthropic
+import openai
 from django.conf import settings
 import json
 
@@ -119,15 +120,24 @@ class ExcelProcessor:
 
 
 class AIAgent:
-    """Utility class for AI-powered chat using Claude API"""
+    """Utility class for AI-powered chat using Anthropic or OpenAI"""
 
-    def __init__(self):
-        self.api_key = settings.ANTHROPIC_API_KEY
-        if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY is not set in environment variables")
+    def __init__(self, provider=None):
+        # Use provider from parameter or settings
+        self.provider = (provider or settings.AI_PROVIDER).lower()
 
-        self.client = anthropic.Anthropic(api_key=self.api_key)
-        self.model = "claude-sonnet-4-5-20250929"
+        if self.provider == 'anthropic':
+            if not settings.ANTHROPIC_API_KEY:
+                raise ValueError("ANTHROPIC_API_KEY is not set in environment variables")
+            self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            self.model = "claude-sonnet-4-5-20250929"
+        elif self.provider == 'openai':
+            if not settings.OPENAI_API_KEY:
+                raise ValueError("OPENAI_API_KEY is not set in environment variables")
+            self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+            self.model = "gpt-4o"
+        else:
+            raise ValueError(f"Invalid AI provider: {self.provider}. Must be 'anthropic' or 'openai'")
 
     def create_system_prompt(self, excel_data):
         """Create a system prompt with Excel data context"""
@@ -152,7 +162,7 @@ Important notes:
 
     def chat(self, user_message, excel_data, conversation_history=None):
         """
-        Send a message to Claude and get a response
+        Send a message to AI provider and get a response
 
         Args:
             user_message: The user's question/message
@@ -177,19 +187,30 @@ Important notes:
             "content": user_message
         })
 
-        # Call Claude API
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=system_prompt,
-                messages=messages
-            )
+            if self.provider == 'anthropic':
+                # Call Anthropic Claude API
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    system=system_prompt,
+                    messages=messages
+                )
+                return response.content[0].text
 
-            return response.content[0].text
+            elif self.provider == 'openai':
+                # Call OpenAI API
+                # Add system message at the beginning for OpenAI
+                openai_messages = [{"role": "system", "content": system_prompt}] + messages
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    messages=openai_messages
+                )
+                return response.choices[0].message.content
 
         except Exception as e:
-            return f"Error communicating with AI: {str(e)}"
+            return f"Error communicating with {self.provider.title()} AI: {str(e)}"
 
     def analyze_excel(self, excel_processor):
         """Provide an initial analysis of the Excel file"""
