@@ -109,8 +109,8 @@ def send_message(request, session_id):
             for msg in previous_messages
         ]
 
-        # Get AI response
-        ai_agent = AIAgent()
+        # Get AI response with tool calling support
+        ai_agent = AIAgent(excel_processor=processor)
         ai_response = ai_agent.chat(user_message, excel_data, conversation_history)
 
         # Save AI response

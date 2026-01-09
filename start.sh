@@ -121,38 +121,81 @@ if [ -f ".env" ]; then
     echo ""
 fi
 
-# Check if API key is set
-if [ -z "$ANTHROPIC_API_KEY" ] || [ "$ANTHROPIC_API_KEY" = "anthropic-token-here" ]; then
-    echo -e "${YELLOW}⚠ Warning: ANTHROPIC_API_KEY not configured properly${NC}"
-    echo ""
-    echo "Your API key is either missing or using the default placeholder."
-    echo ""
-    read -p "Would you like to set your API key now? (y/n): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        read -p "Enter your Anthropic API key: " api_key
-        if [ -f ".env" ]; then
-            # Update .env file
-            if grep -q "ANTHROPIC_API_KEY=" .env; then
-                sed -i '' "s/ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$api_key/" .env
+# Check AI provider and validate corresponding API key
+AI_PROVIDER_VALUE=${AI_PROVIDER:-anthropic}
+
+if [ "$AI_PROVIDER_VALUE" = "anthropic" ]; then
+    # Check Anthropic API key
+    if [ -z "$ANTHROPIC_API_KEY" ] || [ "$ANTHROPIC_API_KEY" = "anthropic-token-here" ]; then
+        echo -e "${YELLOW}⚠ Warning: ANTHROPIC_API_KEY not configured properly${NC}"
+        echo ""
+        echo "Your Anthropic API key is either missing or using the default placeholder."
+        echo ""
+        read -p "Would you like to set your Anthropic API key now? (y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            read -p "Enter your Anthropic API key: " api_key
+            if [ -f ".env" ]; then
+                # Update .env file
+                if grep -q "ANTHROPIC_API_KEY=" .env; then
+                    sed -i '' "s/ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$api_key/" .env
+                else
+                    echo "ANTHROPIC_API_KEY=$api_key" >> .env
+                fi
+                export ANTHROPIC_API_KEY="$api_key"
+                echo -e "${GREEN}✓${NC} Anthropic API key saved to .env file"
+                echo ""
             else
-                echo "ANTHROPIC_API_KEY=$api_key" >> .env
+                export ANTHROPIC_API_KEY="$api_key"
+                echo -e "${GREEN}✓${NC} Anthropic API key set for this session"
+                echo ""
+                echo "Note: Key is only set for this session. Create a .env file to persist it."
+                echo ""
             fi
-            export ANTHROPIC_API_KEY="$api_key"
-            echo -e "${GREEN}✓${NC} API key saved to .env file"
-            echo ""
         else
-            export ANTHROPIC_API_KEY="$api_key"
-            echo -e "${GREEN}✓${NC} API key set for this session"
             echo ""
-            echo "Note: Key is only set for this session. Create a .env file to persist it."
+            echo -e "${YELLOW}Warning: Application will not work without a valid Anthropic API key.${NC}"
             echo ""
         fi
-    else
-        echo ""
-        echo -e "${YELLOW}Warning: Application will not work without a valid API key.${NC}"
-        echo ""
     fi
+elif [ "$AI_PROVIDER_VALUE" = "openai" ]; then
+    # Check OpenAI API key
+    if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "openai-token-here" ]; then
+        echo -e "${YELLOW}⚠ Warning: OPENAI_API_KEY not configured properly${NC}"
+        echo ""
+        echo "Your OpenAI API key is either missing or using the default placeholder."
+        echo ""
+        read -p "Would you like to set your OpenAI API key now? (y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            read -p "Enter your OpenAI API key: " api_key
+            if [ -f ".env" ]; then
+                # Update .env file
+                if grep -q "OPENAI_API_KEY=" .env; then
+                    sed -i '' "s/OPENAI_API_KEY=.*/OPENAI_API_KEY=$api_key/" .env
+                else
+                    echo "OPENAI_API_KEY=$api_key" >> .env
+                fi
+                export OPENAI_API_KEY="$api_key"
+                echo -e "${GREEN}✓${NC} OpenAI API key saved to .env file"
+                echo ""
+            else
+                export OPENAI_API_KEY="$api_key"
+                echo -e "${GREEN}✓${NC} OpenAI API key set for this session"
+                echo ""
+                echo "Note: Key is only set for this session. Create a .env file to persist it."
+                echo ""
+            fi
+        else
+            echo ""
+            echo -e "${YELLOW}Warning: Application will not work without a valid OpenAI API key.${NC}"
+            echo ""
+        fi
+    fi
+else
+    echo -e "${YELLOW}⚠ Warning: Unknown AI provider '$AI_PROVIDER_VALUE'${NC}"
+    echo "Valid providers are 'anthropic' or 'openai'."
+    echo ""
 fi
 
 # Start the server

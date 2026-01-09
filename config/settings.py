@@ -112,8 +112,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Claude API Configuration
+# AI Provider Configuration
+AI_PROVIDER = os.environ.get('AI_PROVIDER', 'anthropic').lower()  # 'anthropic' or 'openai'
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 # File Upload Settings
 MAX_UPLOAD_SIZE = 10485760  # 10MB

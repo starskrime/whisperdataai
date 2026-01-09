@@ -4,7 +4,7 @@ An AI-powered Excel data analysis application that lets you chat with your sprea
 
 ## What is WhisperData?
 
-WhisperData is a Django web application that combines the power of Claude AI with Excel data analysis. Upload your Excel files and ask questions about your data in plain English - WhisperData will analyze your data and provide intelligent insights, summaries, and answers.
+WhisperData is a Django web application that combines the power of Claude/OpenAI with Excel data analysis. Upload your Excel files and ask questions about your data in plain English - WhisperData will analyze your data and provide intelligent insights, summaries, and answers.
 
 <img width="1650" height="1722" alt="image" src="https://github.com/user-attachments/assets/5bc0b345-a488-408f-9687-dd17302821f2" />
 
@@ -17,12 +17,14 @@ WhisperData is a Django web application that combines the power of Claude AI wit
 - **Large File Support**: Intelligent summarization for large datasets
 - **Chat History**: Access previous chat sessions
 - **Data Viewer**: View your Excel data in a clean table format
-- **Modern UI**: Claude-inspired clean and minimal design
+- **Modern UI**: Clean and minimal design
 
 ## Prerequisites
 
 - Python 3.12 or higher
-- Anthropic API key ([Get one here](https://console.anthropic.com/))
+- API key for your chosen AI provider:
+  - **Anthropic** (Claude): [Get one here](https://console.anthropic.com/)
+  - **OpenAI** (GPT-4): [Get one here](https://platform.openai.com/api-keys)
 
 ## Quick Start
 
@@ -61,9 +63,22 @@ WhisperData is a Django web application that combines the power of Claude AI wit
    pip install -r requirements.txt
    ```
 
-4. **Set up your API key**
+4. **Set up environment variables**
+
+   Create a `.env` file:
    ```bash
-   export ANTHROPIC_API_KEY='your-api-key-here'
+   cp .env.example .env
+   ```
+
+   Edit `.env` and configure your AI provider and API key:
+   ```bash
+   # Choose your provider (anthropic or openai)
+   AI_PROVIDER=anthropic
+
+   # Add your API key
+   ANTHROPIC_API_KEY=your-anthropic-key-here
+   # OR
+   OPENAI_API_KEY=your-openai-key-here
    ```
 
 5. **Run migrations**
@@ -88,10 +103,28 @@ WhisperData is a Django web application that combines the power of Claude AI wit
 4. View your data in table format using the "View Data" button
 5. Access previous chats from the "Recent Chats" section
 
+## AI Provider Configuration
+
+WhisperData supports two AI providers. You can switch between them anytime by editing your `.env` file:
+
+### Anthropic (Claude Sonnet 4.5)
+```bash
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### OpenAI (GPT-4)
+```bash
+AI_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+```
+
+After changing the provider, restart the server for changes to take effect.
+
 ## Technology Stack
 
 - **Backend**: Django 5.0
-- **AI**: Anthropic Claude API (claude-sonnet-4-5)
+- **AI**: Anthropic Claude API (claude-sonnet-4-5) or OpenAI GPT-4
 - **Data Processing**: Pandas
 - **Frontend**: HTML, CSS, JavaScript
 - **Database**: SQLite (default)
